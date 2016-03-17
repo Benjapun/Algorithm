@@ -1,0 +1,338 @@
+import java.util.*;
+public class Tsp {  
+    private String cityName[]=
+    	{"A","B","C","D","E","F"};
+//    		"哈尔滨","长春","沈阳","呼和浩特","石家庄","太原",
+//    		"济南","郑州","西安","兰州","银川","西宁","乌鲁木齐","合肥","南京","杭州","长沙",
+//    		"南昌","武汉","成都","贵州","福建","台北","广州","海口","南宁","昆明","拉萨","香港","澳门"};
+   
+    private int cityNum=cityName.length;     //城市个数
+    //private String cityEnd[]=new String[34];
+    
+    private int popSize = 20;               //种群数量
+    private int maxgens = 20;            //迭代次数
+    private double pxover = 0.5;            //交叉概率
+    private double pmultation = 0.015;       //变异概率
+   
+    private long[][] distance = new long[cityNum][cityNum]; 
+    
+    private int range = 2000;               //用于判断何时停止的数组区间
+    private genotype[] gene_city = new genotype[popSize];
+    
+    
+    private class genotype {
+        int city[] = new int[cityNum];      //单个基因的城市序列
+        long fitness;                      //该基因的适应度
+        double selectP;                        //选择概率
+        int isSelected;                        //是否被选择
+        int best;
+    }
+    /**
+     *    构造函数，初始化种群
+     */
+    public Tsp() {
+        for (int i = 0; i < popSize; i++) {
+            gene_city[i] = new genotype();
+            int[] num = new int[cityNum];
+            for (int j = 0; j < cityNum; j++){
+                num[j] = j;
+            }
+            int temp = cityNum;
+            for (int j = 0; j < cityNum; j++) {
+                int r = (int) (Math.random() * temp);
+                gene_city[i].city[j] = num[r];
+                num[r] = num[temp - 1];
+                temp--;
+            }
+            gene_city[i].fitness = 0;
+            gene_city[i].selectP = 0;           
+            gene_city[i].isSelected = 0;//not be selected
+            gene_city[i].best=0;
+        }
+        initDistance();
+    }
+    private void initDistance(){
+    	
+        for (int i = 0; i < cityNum; i++) {
+            for (int j = 0; j < cityNum; j++){
+                distance[i][j] = Math.abs((i-j));
+            	//distance[i][j] = (int)(10+10*Math.random());
+            }
+        }
+        distance[1][2]=10;
+        distance[2][1]=10;
+        
+        distance[4][2]=5;
+        distance[2][4]=5;
+        
+    }
+    /**
+     *  计算每个种群每个基因个体的适应度，选择概率，期望概率，和是否被选择。
+     */
+    public void CalAll(){
+        for( int i = 0; i< popSize; i++){
+            gene_city[i].fitness = 0;
+            gene_city[i].selectP = 0;
+            gene_city[i].isSelected = 0;
+        }
+        CalFitness();
+        CalSelectP();
+        CalIsSelected();
+    }
+    /**
+     *    填充，将多选的填充到未选的个体当中
+     */
+  
+    public void pad(){
+        int best = 0;
+        int bad = 0;
+        while(true){           
+            while(gene_city[best].isSelected <= 1 && best<popSize-1)
+                best ++;
+            while(gene_city[bad].isSelected != 0 && bad<popSize-1)
+                bad ++;
+           // gene_city[bad].city=gene_city[best].city;
+            for(int i = 0; i< cityNum; i++)
+                gene_city[bad].city[i] = gene_city[best].city[i];
+               
+            gene_city[best].isSelected --;
+            gene_city[bad].isSelected ++;
+            bad ++;   
+            if(best == popSize ||bad == popSize)
+                break;
+        }
+    }
+    /**
+     *    交叉主体函数
+     */
+    public void crossover() {
+        int x=0;
+        int y=0;
+        int pop = (int)(popSize* pxover /2);
+        while(pop>0){
+        	
+	            x = (int)(Math.random()*popSize);
+	            y = (int)(Math.random()*popSize);
+	            if(gene_city[x].best!=1&&gene_city[y].best!=1)
+	        	{
+	            	executeCrossover(x,y);//x y 两个体执行交叉
+	            	pop--;
+	        	}
+        }
+    }
+    /**
+     * 执行交叉函数
+     * @param 个体x
+     * @param 个体y
+     * 对个体x和个体y执行佳点集的交叉，从而产生下一代城市序列
+     */
+    private void executeCrossover(int x,int y){
+    	//int[] index = new int[cityNum];
+    	int begin=0;
+    	int end=0;
+    	do{	
+    		begin=(int)Math.random()*34;
+    	    end=(int)Math.random()*34;
+    	}while(end-begin>0&&end-begin==2);
+    	int len=end-begin;
+    	int[] temp=new int[len];
+    	for(int i=begin,j=0;i<end;i++,j++)
+    	{
+    		temp[j]=gene_city[x].city[i];
+    	}
+    	int index=0;
+    	for(int j=0;j<cityNum;j++){
+	    		for(int m=0;m<len;m++){
+		    		if(gene_city[y].city[j]==temp[m]){
+		   				gene_city[y].city[j]=temp[index];
+		   				index++;
+		   				break;
+		    		}
+	    		}
+    		
+   		}
+    } 	
+    	
+    public void mutate(){
+        double random;
+        int temp;
+        int temp1;
+        int temp2;
+        for( int i = 0 ; i< popSize; i++){
+            random = Math.random();
+            if(random<=pmultation){
+                temp1 = (int)(Math.random() * (cityNum));
+                temp2 = (int)(Math.random() * (cityNum));
+                temp = gene_city[i].city[temp1];
+                gene_city[i].city[temp1] = gene_city[i].city[temp2];
+                gene_city[i].city[temp2] = temp;
+            }
+        }      
+    }
+    private void CalFitness() {
+        for (int i = 0; i < popSize; i++) {
+            for (int j = 0; j < cityNum - 1; j++){
+                gene_city[i].fitness += distance[gene_city[i].city[j]][gene_city[i].city[j + 1]];
+            }
+            gene_city[i].fitness += distance[gene_city[i].city[0]][gene_city[i].city[cityNum - 1]];	
+            System.out.println(gene_city[i].fitness); 
+        }
+     
+      
+    }
+    private void CalSelectP(){
+        long sum = 0;
+        for( int i = 0; i< popSize; i++){
+            sum = sum + gene_city[i].fitness;
+        }
+        for( int i = 0; i< popSize; i++){
+            gene_city[i].selectP = (double)gene_city[i].fitness/sum;
+            //System.out.println(gene_city[i].selectP);
+        }
+    }
+
+    private void CalIsSelected(){
+       int SelItem = popSize;   
+       findbest();
+    	for( int i = 0; i< popSize; i++){
+    		if(gene_city[i].best==1)
+    		{
+    			SelItem--;
+    			gene_city[i].isSelected++;
+    			if(SelItem==0){
+	    	    	 return;
+	    	    }
+    		}
+    		else
+    		{
+	    		double temp=gene_city[i].selectP;
+	    		double rand=Math.random();
+	    		//System.out.println(rand);    		
+	    		if(rand<temp){
+	    			gene_city[i].isSelected++;
+	    	    	SelItem--;	
+	    	    	if(SelItem==0){
+	    	    	 return;
+	    	    	}
+	    		}    	
+	    		else{
+	    			temp=temp+gene_city[i].selectP;
+	    		}
+    		}
+    		
+   		}
+    }
+
+    /**
+     * @param x 数组
+     * @return x数组的值是否全部相等，相等则表示x.length代的最优结果相同，则算法结束
+     */
+    private boolean isSame(long[] x){
+        for( int i = 0; i< x.length -1; i++)
+            if(x[i] !=x[i+1])
+                return false;
+        return true;
+    }
+  
+    private void findbest()
+    {
+    	int index=0;
+    	double temp = Double.MAX_VALUE;
+    	  for (int i = 1; i < popSize; i++) {
+              if(gene_city[i].fitness<temp){
+                  temp = gene_city[i].fitness;
+                  index = i;
+              }
+          }
+    	//  System.out.println(index);
+    	  gene_city[index].best=1;
+
+    }
+    /**
+     * 打印任意代最优的路径序列
+     */
+    private int printBestRoute(){
+        //CalAll();
+    	//long temp = Integer.MAX_VALUE;
+        int index = 0;
+//        for (int i = 0; i < popSize; i++) {
+//            if(gene_city[i].fitness<temp){
+//                temp = gene_city[i].fitness;
+//                index = i;
+//            }
+//        }
+       
+        for (int i = 0; i < popSize; i++)
+        {
+        	if(gene_city[i].best==1)
+        	{
+        		index=i;
+        	}
+        }
+        
+        
+        
+        System.out.println();
+        System.out.println("最佳路径的序列：");
+        for (int j = 0; j < cityNum; j++)
+        {
+            String cityEnd=cityName[gene_city[index].city[j]];
+            System.out.print(cityEnd + " ");
+        }
+            //System.out.print(gene_city[index].city[j] + cityName[gene_city[index].city[j]] + "  ");
+            //System.out.print(cityName[gene_city[index].city[j]]);
+        System.out.println();
+        return index;
+    }
+    /**
+     * 算法执行
+     */
+    public void run(){
+        long[] result = new long[range];
+        //result初始化为所有的数字都不相等
+        for( int i  = 0; i< range; i++){
+            result[i] = i;
+        }
+        int index = 0;       //数组中的位置
+        int num = 1;     //第num代
+        while(maxgens>0){
+            System.out.println("-----------------  第  "+num+" 代  -------------------------");
+            CalAll();
+           // print();
+            pad();
+            crossover();
+            mutate();
+            findbest();
+            maxgens--;
+           
+            result[index] =  printBestRoute();
+            if(isSame(result))
+                break;
+            index++;
+            if(index==range)
+                index = 0;
+            num++;
+        }
+        //printBestRoute();
+    }
+    /**
+     * @param a 开始时间
+     * @param b   结束时间
+     */
+    public void CalTime(Calendar a,Calendar b){
+        long x = b.getTimeInMillis() - a.getTimeInMillis();
+        long y = x/1000;
+        x = x - 1000*y;
+        System.out.println("算法执行时间："+y+"."+x+" 秒");
+    }
+    /**
+     *    程序入口 
+     */
+    public static void main(String[] args) {
+        Calendar a = Calendar.getInstance(); //开始时间
+        Tsp tsp = new Tsp();
+        tsp.run();
+        Calendar b = Calendar.getInstance(); //结束时间
+        tsp.CalTime(a, b);
+    }
+}
